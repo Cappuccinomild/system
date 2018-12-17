@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-
+#include <curses.h>
 
 int **board, **temp;
 
@@ -13,7 +13,7 @@ void printarr(int, int);
 
 int main(int ac, char*av[]){
 
-    int row, col, i;
+    int row, col, i, j, k;
 
     row = atoi(av[1]);
     col = atoi(av[2]);
@@ -24,12 +24,44 @@ int main(int ac, char*av[]){
     board[5][5] = 1;
     board[6][5] = 1;
 
-    for(i = 0 ; i < 10 ; i++){
-        nextboard(row, col);
+    initscr();
+    clear();
+    for(k = 0 ; k < 10 ; k ++){
+
+        for(i = 1 ; i < row ; i ++){
+            for(j = 1 ; j < col ; j ++){
+                move(i, j);
+                standout();
+                
+                if(board[i][j] == 0) {
+
+                    if(has_colors() == FALSE)
+                        {   endwin();
+                            printf("Your terminal does not support color\n");
+                            exit(1);
+                        }
+                    start_color();         /* Start color          */
+                    init_pair(1, COLOR_RED, COLOR_BLACK);
+
+                    attron(COLOR_PAIR(1));
+                    addstr(" ");
+                    attroff(COLOR_PAIR(1));
+                    
+                }
+                else addstr(" ");
+                standend();
+            }
+            
+        }
+        refresh();
         sleep(1);
-        printarr(row, col);
+        move(1, 1);
+        for(i = 1 ; i < row ; i ++)
+            for(j = 1 ; j < col ; j ++)addstr(" ");
+        move(1,1);
+        nextboard(row, col);
     }
-    
+    endwin();
     return 0;
 }
 
