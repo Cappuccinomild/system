@@ -3,9 +3,11 @@
 #include <unistd.h>
 #include <string.h>
 #include <curses.h>
-
+#include <signal.h>
 
 int **board, **temp;
+int turn;
+double speed;
 
 typedef struct xy {
 	int x;
@@ -17,64 +19,56 @@ void nextboard(int, int);
 int checkarr(int, int);
 void printarr(int, int);
 void title();
-void setboard()
+void setting();
+void setboard();
 xy moveto(int, int, char);
+void printboard(int, int);
+char end();
+void inthandler();
+void resize();
 
 int main(int ac, char*av[]) {
 
 	int row, col, i, j, k;
+	char ch = 'r';
 
-	title();
-	setting();
+	struct sigaction newhandler;	/* new settings        */
+	sigset_t	 blocked;	/* set of blocked sigs */
+
+	/* load these two members first */
+	newhandler.sa_handler = inthandler;	/* handler function    */
+
+	newhandler.sa_flags = SA_RESTART;
+
+	/* then build the list of blocked signals */
+	sigemptyset(&blocked);			/* clear all bits      */
+	sigaddset(&blocked, SIGQUIT);		/* add SIGQUIT to list */
+	newhandler.sa_mask = blocked;		/* store blockmask     */
+
+	if (sigaction(SIGINT, &newhandler, NULL) == -1)
+		perror("sigaction");
+
+	title();//타이틀 화면 출력
+	do {
+		setting();//세팅 화면 출력 (턴 수, 초)
+
+		//창 크기 변화 대응
+		row = LINES;
+		col = COLS;
+
+		mkarr(row, col);//보드 동적할당
 
 
-	row = atoi(av[1]);
-	col = atoi(av[2]);
+		setboard();//세포 입력
 
-	mkarr(row, col);
-
-	setboard();
-
-	initscr();
-	clear();
-	for (k = 0; k < turn; k++) {
-
-		for (i = 0; i < row; i++) {
-			for (j = 0; j < col; j++) {
-				move(i, j);
-				standout();
-
-				if (board[i + 1][j + 1] == 0) {
-
-					if (has_colors() == FALSE)
-					{
-						endwin();
-						printf("Your terminal does not support color\n");
-						exit(1);
-					}
-					start_color();         /* Start color          */
-					init_pair(1, COLOR_RED, COLOR_BLACK);
-
-					attron(COLOR_PAIR(2));
-					addstr(" ");
-					attroff(COLOR_PAIR(2));
-
-				}
-				else {
-					addstr(" ");
-				}
-				standend();
-			}
-
+		for (k = 0; k < turn; k++) {
+			printboard(row, col);
+			nextboard(row, col);
 		}
-		refresh();
-		usleep(speed);
-		move(0, 0);
-		for (i = 0; i < row; i++)
-			for (j = 0; j < col; j++)addstr(" ");
-		move(1, 1);
-		nextboard(row, col);
-	}
+
+		//end
+		ch = end();
+	} while (ch != 'q');
 	endwin();
 	return 0;
 }
@@ -103,6 +97,7 @@ void nextboard(int row, int col) {
 			switch (checkarr(i, j)) {
 
 			case 2://상태 유지
+				temp[i][j] = board[i][j];
 				break;
 
 			case 3://살아남
@@ -199,7 +194,7 @@ void title() {//메인화면 출력
 		for (j = 0; j < col; j++) {
 			move(i, j);
 			standout();
-			start_color();         /* Start color */
+			start_color();			/* Start color */
 			init_pair(1, COLOR_BLACK, COLOR_WHITE);
 
 			attron(COLOR_PAIR(1));
@@ -210,6 +205,75 @@ void title() {//메인화면 출력
 	}
 	refresh();
 	getch();
+	endwin();
+
+}
+
+void setting() {
+	int i, j, row = 24, col = 80;
+	char input;
+	char input_turn[40], input_speed[40];
+	char arr[24][80] = { "********************************************************************************",
+						"*                                                                              *",
+						"*                                                                              *",
+						"*            ********  ******** ******* ******* ** *     *  ******             *",
+						"*            *         *           *       *       **    *  *                  *",
+						"*            ********  *******     *       *    ** * *   *  *  ***             *",
+						"*                   *  *           *       *    ** *  *  *  *    *             *",
+						"*            ********  ********    *       *    ** *    **  ******             *",
+						"*                                                                              *",
+						"*                                                                              *",
+						"*                                                                              *",
+						"*                          Set turn :                                          *",
+						"*                                                                              *",
+						"*                                                                              *",
+						"*                                                                              *",
+						"*                                                                              *",
+						"*                          Set Speed(sec) :                                    *",
+						"*                                                                              *",
+						"*                                                                              *",
+						"*                                                                              *",
+						"*                                                                              *",
+						"*                                                                              *",
+						"*                                                                              *",
+						"********************************************************************************" };
+
+	initscr();
+
+	for (i = 0; i < row; i++) {
+		for (j = 0; j < col; j++) {
+			move(i, j);
+			standout();
+			start_color();			/* Start color */
+			init_pair(1, COLOR_BLACK, COLOR_WHITE);
+
+			attron(COLOR_PAIR(1));
+			addch(arr[i][j]);
+			attroff(COLOR_PAIR(1));
+			standend();
+		}
+	}
+	do {
+		//턴 횟수 입력
+		move(11, 38);
+		addstr("                     ");//clear input
+		move(11, 38);
+		echo();
+		getstr(input_turn);
+
+		//대기시간 입력
+		move(16, 44);
+		addstr("                     ");//clear input
+		move(16, 44);
+		echo();
+		getstr(input_speed);
+
+		turn = atoi(input_turn);
+		speed = atof(input_speed) * 1000000;//마이크로초단위를 초단위로
+
+	} while ((turn <= 0 || speed <= 0));
+
+	refresh();
 	endwin();
 
 }
@@ -258,7 +322,7 @@ void setboard() {
 	}
 
 
-	start_color();			/* Start color 			*/
+	start_color();			/* Start color */
 	init_pair(1, COLOR_WHITE, COLOR_BLACK);
 	init_pair(2, COLOR_BLACK, COLOR_WHITE);
 	while (1) {
@@ -345,4 +409,79 @@ xy moveto(int x, int y, char key) {
 	result.y = y;
 
 	return result;
-}}
+}
+
+void printboard(int row, int col) {
+	int i, j;
+
+	initscr();
+	clear();
+	for (i = 0; i < row; i++) {
+		for (j = 0; j < col; j++) {
+			move(i, j);
+			standout();
+
+			if (board[i + 1][j + 1] == 0) {
+
+				if (has_colors() == FALSE)
+				{
+					endwin();
+					printf("Your terminal does not support color\n");
+					exit(1);
+				}
+				start_color();			/* Start color */
+
+				init_pair(2, COLOR_BLACK, COLOR_RED);
+				attron(COLOR_PAIR(2));
+				addstr(" ");
+				attroff(COLOR_PAIR(2));
+
+			}
+			else {
+				addstr(" ");
+			}
+			standend();
+		}
+
+	}
+	refresh();
+	usleep(speed);
+	move(0, 0);
+	for (i = 0; i < row; i++)
+		for (j = 0; j < col; j++)addstr(" ");
+
+	move(1, 1);
+
+}
+
+char end() {
+
+	move(9, 27);
+	addstr("Game End!");
+	move(10, 27);
+	addstr("restart : press any key     exit : q");
+	refresh();
+
+	return getch();
+
+}
+
+void inthandler() {
+
+	setting();
+
+}
+
+void resize() {//resize
+
+	int i;
+
+	board = (int**)realloc(board, sizeof(int*) * LINES);
+	temp = (int**)realloc(temp, sizeof(int*) * LINES);
+
+	for (i = 0; i < LINES; i++) {
+		board[i] = (int*)realloc(board[i], sizeof(int) * COLS);
+		temp[i] = (int*)realloc(temp[i], sizeof(int) * COLS);
+	}
+
+}
