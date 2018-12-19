@@ -1,8 +1,8 @@
-﻿#include <stdio.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-
+#include <curses.h>
 
 int **board, **temp;
 
@@ -10,11 +10,10 @@ void mkarr(int, int);
 void nextboard(int, int);
 int checkarr(int, int);
 void printarr(int, int);
-void title();
 
 int main(int ac, char*av[]) {
 
-	int row, col, i;
+	int row, col, i, j, k;
 
 	row = atoi(av[1]);
 	col = atoi(av[2]);
@@ -25,12 +24,45 @@ int main(int ac, char*av[]) {
 	board[5][5] = 1;
 	board[6][5] = 1;
 
-	for (i = 0; i < 10; i++) {
-		nextboard(row, col);
-		sleep(1);
-		printarr(row, col);
-	}
+	initscr();
+	clear();
+	for (k = 0; k < 10; k++) {
 
+		for (i = 1; i < row; i++) {
+			for (j = 1; j < col; j++) {
+				move(i, j);
+				standout();
+
+				if (board[i][j] == 0) {
+
+					if (has_colors() == FALSE)
+					{
+						endwin();
+						printf("Your terminal does not support color\n");
+						exit(1);
+					}
+					start_color();         /* Start color          */
+					init_pair(1, COLOR_RED, COLOR_BLACK);
+
+					attron(COLOR_PAIR(1));
+					addstr(" ");
+					attroff(COLOR_PAIR(1));
+
+				}
+				else addstr(" ");
+				standend();
+			}
+
+		}
+		refresh();
+		sleep(1);
+		move(1, 1);
+		for (i = 1; i < row; i++)
+			for (j = 1; j < col; j++)addstr(" ");
+		move(1, 1);
+		nextboard(row, col);
+	}
+	endwin();
 	return 0;
 }
 
@@ -57,14 +89,14 @@ void nextboard(int row, int col) {
 
 			switch (checkarr(i, j)) {
 
-			case 2://상태 유지
+			case 2://»óÅÂ À¯Áö
 				break;
 
-			case 3://살아남
+			case 3://»ì¾Æ³²
 				temp[i][j] = 1;
 				break;
 
-			default://죽는다
+			default://Á×´Â´Ù
 				temp[i][j] = 0;
 				break;
 
@@ -119,7 +151,6 @@ void printarr(int row, int col) {
 
 
 }
-
 void title() {//메인화면 출력
 	int i, j, row = 24, col = 80;
 	char arr[24][80] = { "********************************************************************************",
